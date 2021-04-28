@@ -15,7 +15,7 @@ const Wrapper = styled.div`
       padding-right: 15px;
       line-height: 3rem;
       background-color: rgba(255, 255, 255, 0.02);
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: 400;
       letter-spacing: 0.05rem;
       vertical-align: middle;

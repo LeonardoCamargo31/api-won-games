@@ -6,7 +6,7 @@ function LeftMenuFooter() {
   return (
     <Wrapper>
       <div className="poweredBy">
-        Mantido por&nbsp;
+        Powered By{' '}
         <A
           href="https://reactavancado.com.br"
           target="_blank"
