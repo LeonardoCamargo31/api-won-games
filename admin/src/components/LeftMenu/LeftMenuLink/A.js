@@ -1,4 +1,4 @@
-import styled, { css } from "styled-components";
+import styled, { css } from 'styled-components';
 
 const A = styled.a`
   ${({ theme }) => css`
@@ -9,7 +9,7 @@ const A = styled.a`
     min-height: 3.6rem;
     border-left: 0.3rem solid transparent;
     cursor: pointer;
-    color: ${theme.main.colors.leftMenu["link-color"]};
+    color: ${theme.main.colors.leftMenu['link-color']};
     text-decoration: none;
     display: block;
     -webkit-font-smoothing: antialiased;
@@ -24,7 +24,7 @@ const A = styled.a`
       text-decoration: none;
     }
     &:visited {
-      color: ${theme.main.colors.leftMenu["link-color"]};
+      color: ${theme.main.colors.leftMenu['link-color']};
     }
     &.linkActive {
       color: white !important;
