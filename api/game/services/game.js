@@ -5,7 +5,7 @@
  * to customize this service
  */
 const axios = require('axios');
-
+const slugify = require('slugify');
 
 /**
  * Como alguns dados são consumidos dinamicamente na página
@@ -28,6 +28,27 @@ async function getGameInfo(slug){
   };
 }
 
+/**
+ * Buscar dados já criados para evitar erro de item duplicado
+ */
+async function getByName(name, entityName){
+  const item = await strapi.services[entityName].find({name});
+  return item.length ? item[0]:null;
+}
+
+/**
+ * Criar dado
+ */
+async function create(name, entityName){
+  const item = await getByName(name,entityName);
+
+  if(!item){
+    return await strapi.services[entityName].create({
+      name,
+      slug: slugify(name,{ lower:true })
+    });
+  }
+}
 
 module.exports = {
   populate: async (params) =>{
@@ -35,8 +56,11 @@ module.exports = {
 
     const {data:{products}}= await axios.get(gogApiUrl);
 
+    console.log(products[0].slug);
 
-    console.log(await getGameInfo(products[0].slug));
+    await create(products[0].publisher, 'publisher');
+    await create(products[0].developer, 'developer');
+
     return products;
   }
 };
