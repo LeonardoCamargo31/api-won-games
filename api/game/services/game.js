@@ -6,6 +6,7 @@
  */
 const axios = require('axios');
 const slugify = require('slugify');
+const querystring = require('querystring');
 
 /**
  * Pegar qualquer erro que venha da nossa promise
@@ -55,12 +56,12 @@ async function getByName(name, entityName){
  * Criar dados
  */
 async function create(name, entityName){
-  const item = await getByName(name,entityName);
+  const item = await getByName(name, entityName);
 
-  if(!item){
+  if (!item) {
     return await strapi.services[entityName].create({
       name,
-      slug: slugify(name,{ lower:true })
+      slug: slugify(name, { strict: true, lower: true }),
     });
   }
 }
@@ -69,79 +70,38 @@ async function create(name, entityName){
  * Criar dados percorrendo array de produtos
  */
 async function createManyToManyData(products) {
-  const developers = {};
-  const publishers = {};
-  const categories = {};
-  const platforms = {};
+  const developers = new Set();
+  const publishers = new Set();
+  const categories = new Set();
+  const platforms = new Set();
 
   products.forEach((product) => {
     const { developer, publisher, genres, supportedOperatingSystems } = product;
 
-    genres &&
+    if(genres){
       genres.forEach((item) => {
-        categories[item] = true;
+        categories.add(item);
       });
-    supportedOperatingSystems &&
+    }
+
+    if(supportedOperatingSystems){
       supportedOperatingSystems.forEach((item) => {
-        platforms[item] = true;
+        platforms.add(item);
       });
-    developers[developer] = true;
-    publishers[publisher] = true;
+    }
+
+    developers.add(developer);
+    publishers.add(publisher);
   });
 
+  const createCall = (set, entityName) => Array.from(set).map((name) => create(name, entityName));
+
   return Promise.all([
-    ...Object.keys(developers).map((name) => create(name, 'developer')),
-    ...Object.keys(publishers).map((name) => create(name, 'publisher')),
-    ...Object.keys(categories).map((name) => create(name, 'category')),
-    ...Object.keys(platforms).map((name) => create(name, 'platform')),
+    ...createCall(developers, 'developer'),
+    ...createCall(publishers, 'publisher'),
+    ...createCall(categories, 'category'),
+    ...createCall(platforms, 'platform'),
   ]);
-}
-
-
-async function createGames(products) {
-  await Promise.all(
-    products.map(async (product) => {
-      const item = await getByName(product.title, 'game');
-
-      if (!item) {
-        console.info(`Creating: ${product.title}...`);
-
-        const game = await strapi.services.game.create({
-          name: product.title,
-          slug: product.slug.replace(/_/g, '-'),
-          price: product.price.amount,
-          release_date: new Date(
-            Number(product.globalReleaseDate) * 1000
-          ).toISOString(),
-          categories: await Promise.all(
-            // criando genres
-            product.genres.map((name) => getByName(name, 'category'))
-          ),
-          platforms: await Promise.all(
-            // criando platform
-            product.supportedOperatingSystems.map((name) =>
-              getByName(name, 'platform')
-            )
-          ),
-          developers: [await getByName(product.developer, 'developer')],
-          publisher: await getByName(product.publisher, 'publisher'),
-          ...(await getGameInfo(product.slug)),
-        });
-
-        //upload das imagens
-        await setImage({ image: product.image, game });
-        await Promise.all(
-          product.gallery
-            .slice(0, 5)
-            .map((url) => setImage({ image: url, game, field: 'gallery' }))
-        );
-
-        await timeout(2000);
-
-        return game;
-      }
-    })
-  );
 }
 
 /**
@@ -177,16 +137,58 @@ async function setImage({ image, game, field = 'cover' }) {
   }
 }
 
+async function createGames(products) {
+  await Promise.all(
+    products.map(async (product) => {
+      const item = await getByName(product.title, 'game');
+
+      if (!item) {
+        console.info(`Creating: ${product.title}...`);
+
+        const game = await strapi.services.game.create({
+          name: product.title,
+          slug: product.slug.replace(/_/g, '-'),
+          price: product.price.amount,
+          release_date: new Date(
+            Number(product.globalReleaseDate) * 1000
+          ).toISOString(),
+          categories: await Promise.all(
+            product.genres.map((name) => getByName(name, 'category'))
+          ),
+          platforms: await Promise.all(
+            product.supportedOperatingSystems.map((name) =>
+              getByName(name, 'platform')
+            )
+          ),
+          developers: [await getByName(product.developer, 'developer')],
+          publisher: await getByName(product.publisher, 'publisher'),
+          ...(await getGameInfo(product.slug)),
+        });
+
+        // upload das imagens
+        await setImage({ image: product.image, game });
+        await Promise.all(
+          product.gallery
+            .slice(0, 5)
+            .map((url) => setImage({ image: url, game, field: 'gallery' }))
+        );
+
+        await timeout(2000);
+
+        return game;
+      }
+    })
+  );
+}
+
 module.exports = {
   populate: async (params) =>{
     try{
-      const gogApiUrl = 'https://www.gog.com/games/ajax/filtered?mediaType=game&page=1&sort=popularity';
-
-      const {data:{products}}= await axios.get(gogApiUrl);
+      const gogApiUrl = `https://www.gog.com/games/ajax/filtered?mediaType=game&${querystring.stringify(params)}`;
+      const { data: { products }} = await axios.get(gogApiUrl);
+      console.log(products);
       await createManyToManyData(products);
       await createGames(products);
-
-      return products;
     } catch (e) {
       console.log('populate', Exception(e));
     }
